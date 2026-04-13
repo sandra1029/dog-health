@@ -669,12 +669,20 @@ body {
     <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">拍照或上傳便便照片，AI 會自動分析布里斯托分級，判斷腸胃健康。</p>
 
     <!-- API Key -->
-    <div class="api-key-box">
+    <div class="api-key-box" id="apiKeyBox">
       <label>🔑 Gemini API Key</label>
-      <input type="password" class="api-key-input" id="geminiKey" placeholder="貼上你的 API Key...">
-      <a class="api-key-link" href="https://aistudio.google.com/apikey" target="_blank">
-        👉 免費申請 Gemini API Key（Google AI Studio）
-      </a>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <input type="password" class="api-key-input" id="geminiKey" placeholder="貼上你的 API Key..."
+               oninput="onApiKeyChange()">
+        <button onclick="toggleKeyVisibility()" style="padding:6px 10px; border-radius:8px; border:1px solid #e0d0c0;
+                background:#fff; cursor:pointer; font-size:14px; flex-shrink:0;" id="toggleKeyBtn" title="顯示/隱藏">👁️</button>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; flex-wrap:wrap; gap:4px;">
+        <a class="api-key-link" href="https://aistudio.google.com/apikey" target="_blank">
+          👉 免費申請 Gemini API Key（Google AI Studio）
+        </a>
+        <span id="keySavedHint" style="font-size:11px; color:#4caf50; font-weight:600; display:none;">✅ 已自動儲存</span>
+      </div>
     </div>
 
     <!-- Upload Area -->
@@ -1110,9 +1118,54 @@ function showToast(msg) {
 
 // ==================== STOOL AI ANALYSIS ====================
 let stoolImageBase64 = null;
+let apiKeySaveTimer = null;
+
+// Load saved API key on startup
+function loadSavedApiKey() {
+  try {
+    const saved = localStorage.getItem('gemini_api_key');
+    if (saved) {
+      document.getElementById('geminiKey').value = saved;
+      const hint = document.getElementById('keySavedHint');
+      hint.textContent = '🔒 已載入儲存的 Key';
+      hint.style.display = 'inline';
+    }
+  } catch(e) {}
+}
+
+function onApiKeyChange() {
+  clearTimeout(apiKeySaveTimer);
+  apiKeySaveTimer = setTimeout(() => {
+    const key = document.getElementById('geminiKey').value.trim();
+    try {
+      if (key) {
+        localStorage.setItem('gemini_api_key', key);
+        const hint = document.getElementById('keySavedHint');
+        hint.textContent = '✅ 已自動儲存';
+        hint.style.display = 'inline';
+        setTimeout(() => { hint.style.display = 'none'; }, 2000);
+      } else {
+        localStorage.removeItem('gemini_api_key');
+      }
+    } catch(e) {}
+  }, 800);
+}
+
+function toggleKeyVisibility() {
+  const input = document.getElementById('geminiKey');
+  const btn = document.getElementById('toggleKeyBtn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+  }
+}
 
 function openStoolModal() {
   document.getElementById('stoolModalOverlay').classList.add('show');
+  loadSavedApiKey();
 }
 function closeStoolModal() {
   document.getElementById('stoolModalOverlay').classList.remove('show');
