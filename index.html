@@ -1263,30 +1263,58 @@ async function analyzeStool() {
 }`;
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: 'image/jpeg', data: stoolImageBase64 } }
-            ]
-          }],
-          generationConfig: { temperature: 0.2, maxOutputTokens: 600 }
-        })
-      }
-    );
+    // Try multiple models in order (free tier friendly)
+    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    let lastError = null;
+    let text = '';
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || `API 錯誤 (${response.status})`);
+    for (const model of models) {
+      try {
+        textEl.innerHTML = `<span class="spinner"></span> 嘗試 ${model}...`;
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: prompt },
+                  { inlineData: { mimeType: 'image/jpeg', data: stoolImageBase64 } }
+                ]
+              }],
+              generationConfig: { temperature: 0.2, maxOutputTokens: 600 }
+            })
+          }
+        );
+
+        if (response.status === 429) {
+          // Rate limited — try next model
+          lastError = new Error(`${model} 額度已滿，嘗試下一個模型...`);
+          continue;
+        }
+
+        if (!response.ok) {
+          const err = await response.json();
+          const msg = err.error?.message || '';
+          if (msg.includes('quota') || msg.includes('Quota') || msg.includes('rate')) {
+            lastError = new Error(`${model} 額度已滿`);
+            continue;
+          }
+          throw new Error(msg || `API 錯誤 (${response.status})`);
+        }
+
+        const data = await response.json();
+        text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (text) break; // Success!
+      } catch (modelErr) {
+        lastError = modelErr;
+        if (modelErr.message.includes('額度')) continue;
+        throw modelErr;
+      }
     }
 
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!text) throw lastError || new Error('所有模型都無法使用');
 
     // Parse JSON from response (handle markdown code blocks)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -1316,12 +1344,18 @@ async function analyzeStool() {
     const box = document.getElementById('aiResultBox');
     box.classList.add('show', 'error');
     box.querySelector('.ai-result-header').innerHTML = `<span style="font-size:20px;">❌</span> 分析失敗`;
+    const isQuota = err.message.includes('額度') || err.message.includes('quota') || err.message.includes('Quota');
     box.querySelector('.ai-result-detail').innerHTML =
       `<strong>錯誤訊息：</strong>${err.message}<br><br>`
-      + `<strong>常見原因：</strong><br>`
-      + `• API Key 無效或過期 → <a href="https://aistudio.google.com/apikey" target="_blank">重新申請</a><br>`
-      + `• 照片不清楚 → 請重新拍攝近照<br>`
-      + `• 網路連線問題 → 請檢查網路`;
+      + (isQuota
+        ? `<strong>💡 解決方法：</strong><br>`
+          + `• 免費額度用完了，<strong>等 1 分鐘後再試一次</strong><br>`
+          + `• 或到 <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a> 建立新的 API Key<br>`
+          + `• Gemini 免費版每分鐘限 15 次請求，稍等即可恢復`
+        : `<strong>常見原因：</strong><br>`
+          + `• API Key 無效或過期 → <a href="https://aistudio.google.com/apikey" target="_blank">重新申請</a><br>`
+          + `• 照片不清楚 → 請重新拍攝近照<br>`
+          + `• 網路連線問題 → 請檢查網路`);
   } finally {
     btn.disabled = false;
     textEl.innerHTML = '🤖 開始 AI 分析';
