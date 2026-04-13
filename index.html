@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐾 小狗健康日誌 — AI 智慧守護系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+
+:root {
+  --bg: #fdf6ec;
+  --bg2: #f5ead8;
+  --card: #fff;
+  --accent: #c8875b;
+  --accent-dark: #a0612e;
+  --text: #5a3e1b;
+  --text2: #8d7a60;
+  --text3: #b09070;
+  --border: #f0e4d6;
+  --border2: #e8d5c0;
+  --green: #4caf50;
+  --green-bg: #f0f7e8;
+  --green-text: #33691e;
+  --orange: #e65100;
+  --orange-bg: #fff3e0;
+  --red: #d32f2f;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Noto Sans TC', 'Segoe UI', sans-serif;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== HEADER ===== */
+.header {
+  background: linear-gradient(135deg, #f5deb3, #e8c99b);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid #dfc9a8;
+  position: relative;
+  overflow: hidden;
+}
+.header::before, .header::after {
+  content: '🐾';
+  position: absolute;
+  opacity: 0.12;
+  font-size: 22px;
+}
+.header::before { top: 6px; left: 80px; }
+.header::after { bottom: 4px; right: 120px; font-size: 18px; }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.header-logo { font-size: 34px; }
+.header-title { font-size: 22px; font-weight: 800; letter-spacing: 1px; }
+.header-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Dog selector tabs */
+.dog-tabs { display: flex; gap: 8px; }
+.dog-tab {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 2px solid var(--border2);
+  background: #fff9f2;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text);
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.dog-tab:hover { border-color: var(--accent); }
+.dog-tab.active {
+  border-color: var(--accent);
+  background: linear-gradient(135deg, #ffe8d0, #ffd4a8);
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(200,135,91,0.25);
+}
+
+.btn-add {
+  padding: 10px 22px;
+  border-radius: 16px;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(160,97,46,0.3);
+  font-family: inherit;
+  transition: transform 0.15s;
+}
+.btn-add:hover { transform: translateY(-1px); }
+
+/* ===== MAIN GRID ===== */
+.main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr 320px;
+  gap: 18px;
+  padding: 20px 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* ===== CARD ===== */
+.card {
+  background: var(--card);
+  border-radius: 18px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 12px rgba(180,140,100,0.10);
+  border: 1px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+.card::after {
+  content: '🐾';
+  position: absolute;
+  top: -4px;
+  right: 8px;
+  opacity: 0.08;
+  font-size: 20px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.card-title-icon { margin-right: 6px; }
+.card-date { font-size: 12px; color: var(--text3); }
+
+/* ===== PROFILE ===== */
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #fff7ed, #ffecd2);
+  border-radius: 16px;
+  margin-bottom: 16px;
+}
+.profile-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  box-shadow: 0 2px 8px rgba(200,135,91,0.2);
+  border: 2px solid #f0d8c0;
+}
+.profile-name { font-weight: 700; font-size: 17px; }
+.profile-info { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+/* ===== CALENDAR ===== */
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+  font-size: 12px;
+}
+.cal-head { color: var(--text3); font-weight: 600; padding: 4px; }
+.cal-day {
+  padding: 5px 2px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cal-day:hover { background: #f5eed8; }
+.cal-day.today {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+.cal-day.deworm {
+  background: #ffe0b2;
+  color: var(--orange);
+}
+.cal-day.deworm-label { font-size: 8px; display: block; }
+
+/* Tasks */
+.task-box {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff7ed;
+  border-radius: 12px;
+  font-size: 13px;
+}
+.task-box-title { font-weight: 600; color: var(--accent); margin-bottom: 6px; }
+.task-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  color: var(--text);
+}
+.task-item input { accent-color: var(--accent); }
+.task-done { text-decoration: line-through; opacity: 0.6; }
+
+/* Deworm Banner */
+.deworm-banner {
+  margin-top: 10px;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.deworm-info { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); color: #2e7d32; }
+.deworm-urgent { background: linear-gradient(135deg, #fff3e0, #ffe0b2); color: var(--orange); }
+.deworm-banner strong { display: block; }
+.deworm-banner small { font-size: 12px; }
+
+/* ===== TIMELINE ===== */
+.timeline { max-height: 360px; overflow-y: auto; padding-right: 4px; }
+.timeline::-webkit-scrollbar { width: 5px; }
+.timeline::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+
+.timeline-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed #efe0d0;
+}
+.timeline-item:last-child { border-bottom: none; }
+.timeline-time { min-width: 58px; font-size: 12px; color: var(--text3); padding-top: 2px; }
+.timeline-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.timeline-icon.normal { background: #f5eed8; }
+.timeline-icon.alert { background: #fff0e0; }
+.timeline-cat { font-size: 12px; color: var(--text3); margin-bottom: 2px; }
+.timeline-note { font-size: 14px; }
+.timeline-note.alert-text { color: #d84315; font-weight: 600; }
+
+.bristol-tag {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ===== CHARTS ===== */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.chart-subtitle { font-size: 11px; color: var(--text3); margin-bottom: 8px; }
+.chart-wrap { position: relative; height: 180px; }
+
+/* ===== ALERT BANNER ===== */
+.alert-banner {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  border-radius: 14px;
+  padding: 14px 18px;
+  border: 1px solid #ffcc80;
+  margin-bottom: 12px;
+}
+.alert-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.alert-title span:last-child { font-weight: 700; color: var(--orange); font-size: 14px; }
+.alert-body { font-size: 13px; color: var(--text); line-height: 1.6; }
+.alert-btn {
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--orange);
+  background: #fff;
+  color: var(--orange);
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+/* ===== AI Summary ===== */
+.ai-summary {
+  background: var(--green-bg);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--green-text);
+  margin-bottom: 10px;
+}
+.ai-tip { font-size: 12px; color: var(--text2); padding: 6px 0; }
+
+/* ===== STOOL ANALYSIS ===== */
+.bristol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text);
+  transition: all 0.2s;
+  border: 2px solid transparent;
+  margin-bottom: 3px;
+}
+.bristol-row.active { border-width: 2px; border-style: solid; }
+.bristol-num { font-weight: 700; min-width: 14px; }
+.bristol-current { margin-left: auto; font-weight: 700; }
+
+.stool-result {
+  background: var(--green-bg);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--green-text);
+  margin-top: 10px;
+}
+.stool-result small { font-size: 12px; color: #558b2f; }
+
+.btn-upload {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1.5px dashed var(--accent);
+  background: #fff7ed;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-upload:hover { background: #ffecd2; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: #fffaf3;
+  border-radius: 24px;
+  padding: 28px 32px;
+  width: 440px;
+  max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(100,60,20,0.2);
+  transform: translateY(20px);
+  transition: transform 0.25s;
+}
+.modal-overlay.show .modal { transform: translateY(0); }
+.modal h3 { margin-bottom: 18px; font-size: 18px; color: var(--text); }
+
+.cat-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.cat-btn {
+  padding: 6px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--border2);
+  background: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.cat-btn.active { font-weight: 700; }
+
+.modal label {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+.modal textarea {
+  width: 100%;
+  min-height: 80px;
+  border-radius: 12px;
+  border: 1.5px solid #e0d0c0;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+  background: #fff;
+}
+.modal textarea:focus { outline: none; border-color: var(--accent); }
+
+.bristol-slider { width: 100%; accent-color: var(--accent); margin-bottom: 14px; }
+
+.modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+.btn-cancel {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: 1.5px solid #d0c0a8;
+  background: #fff;
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: inherit;
+}
+.btn-save {
+  flex: 2;
+  padding: 10px 0;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 700;
+  font-family: inherit;
+  box-shadow: 0 3px 10px rgba(200,135,91,0.3);
+}
+
+/* ===== FOOTER ===== */
+.footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 12px;
+  color: var(--text3);
+  border-top: 1px solid var(--border2);
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--accent-dark);
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(100,60,20,0.3);
+  transition: transform 0.3s;
+  z-index: 2000;
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; }
+  .charts-row { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="header">
+  <div class="header-left">
+    <span class="header-logo">🐕</span>
+    <div>
+      <div class="header-title">小狗健康日誌</div>
+      <div class="header-sub">AI 智慧健康守護系統</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="dog-tabs" id="dogTabs"></div>
+    <button class="btn-add" onclick="openModal()">＋ 新增紀錄</button>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<main class="main-grid">
+
+  <!-- LEFT COLUMN -->
+  <div>
+    <div class="profile-card" id="profileCard"></div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📅</span>每月醫療任務</div>
+      </div>
+      <div class="cal-grid" id="calendar"></div>
+      <div class="task-box" id="taskBox"></div>
+      <div id="dewormBanner"></div>
+    </div>
+  </div>
+
+  <!-- CENTER COLUMN -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">📋</span>近期日誌紀錄</div>
+        <div class="card-date" id="todayDate"></div>
+      </div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">📈</span>腸胃健康趨勢圖</div>
+        </div>
+        <div class="chart-subtitle">Bristol 分級 (1-7)，3-4 為理想區間</div>
+        <div class="chart-wrap"><canvas id="bristolChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title"><span class="card-title-icon">📊</span>嘔吐頻率追蹤</div>
+        </div>
+        <div class="chart-subtitle">近四週嘔吐次數統計</div>
+        <div class="chart-wrap"><canvas id="vomitChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">🤖</span>AI 洞察與預警</div>
+      </div>
+      <div id="alertArea"></div>
+      <div class="ai-summary" id="aiSummary"></div>
+      <div class="ai-tip" id="aiTip"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title"><span class="card-title-icon">🔬</span>AI 影像分析 (便便)</div>
+      </div>
+      <div id="bristolScale"></div>
+      <div class="stool-result" id="stoolResult"></div>
+      <button class="btn-upload" onclick="showToast('📷 影像上傳功能開發中...')">📷 上傳便便照片分析</button>
+    </div>
+  </div>
+</main>
+
+<!-- ===== MODAL ===== -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modalTitle">📝 新增紀錄</h3>
+    <label>分類</label>
+    <div class="cat-btns" id="catBtns"></div>
+    <div id="bristolSliderBox" style="display:none;">
+      <label id="bristolLabel">Bristol 分級: 4 - 香腸狀軟</label>
+      <input type="range" min="1" max="7" value="4" class="bristol-slider" id="bristolSlider"
+             oninput="updateBristolLabel()">
+    </div>
+    <label>詳細描述</label>
+    <textarea id="noteInput" placeholder="例如：吃 100g 乾糧 + 雞胸肉..."></textarea>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn-save" onclick="saveRecord()">✅ 存入日誌</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">🐾 小狗健康日誌 AI 系統 · 守護每一個毛孩子的健康 🐾</footer>
+
+<script>
+// ==================== DATA STORE ====================
+const BRISTOL_LABELS = {1:"硬塊狀",2:"香腸狀硬",3:"香腸狀裂",4:"香腸狀軟",5:"軟塊狀",6:"泥狀",7:"水狀"};
+const BRISTOL_COLORS = {1:"#d32f2f",2:"#ef6c00",3:"#f9a825",4:"#4caf50",5:"#f9a825",6:"#ef6c00",7:"#d32f2f"};
+const BRISTOL_EMOJI = {1:"⬤⬤ 硬塊",2:"🌰🌰 香腸硬",3:"🟤〰️ 裂紋",4:"🟫〰️ 軟滑 ✓",5:"☁️☁️ 軟塊",6:"🫧💧 泥狀",7:"💧💧 水狀"};
+const CAT_ICONS = {"飲食":"🍖","排泄":"💩","異常":"⚠️","用藥":"💊","運動":"🏃","體重":"⚖️"};
+const CAT_COLORS = {"飲食":"#8d6e63","排泄":"#795548","異常":"#e65100","用藥":"#1565c0","運動":"#2e7d32","體重":"#6a1b9a"};
+
+const state = {
+  dogs: [
+    {id:1, name:"麻糬", avatar:"🐕", breed:"柴犬", age:3, weight:10.2},
+    {id:2, name:"布丁", avatar:"🐩", breed:"貴賓", age:5, weight:4.8},
+  ],
+  activeDogId: 1,
+  records: [
+    {id:1, dogId:1, time:"2026-04-13 08:00", category:"飲食", note:"早餐：100g 乾糧 + 雞胸肉 30g", icon:"🍖"},
+    {id:2, dogId:1, time:"2026-04-13 08:45", category:"排泄", note:"戶外散步，排便正常", icon:"💩", bristolScore:4},
+    {id:3, dogId:1, time:"2026-04-13 09:00", category:"排泄", note:"戶外排尿，顏色正常", icon:"💧"},
+    {id:4, dogId:1, time:"2026-04-13 10:30", category:"異常", note:"早上嘔吐白沫一次", icon:"⚠️", isAlert:true},
+    {id:5, dogId:1, time:"2026-04-13 12:00", category:"飲食", note:"午餐：80g 乾糧 + 南瓜泥", icon:"🍖"},
+    {id:6, dogId:1, time:"2026-04-13 14:00", category:"運動", note:"公園散步 40 分鐘", icon:"🏃"},
+    {id:7, dogId:1, time:"2026-04-12 09:00", category:"排泄", note:"正常排便", icon:"💩", bristolScore:3},
+    {id:8, dogId:1, time:"2026-04-11 09:00", category:"排泄", note:"稍軟", icon:"💩", bristolScore:5},
+    {id:9, dogId:1, time:"2026-04-10 09:00", category:"排泄", note:"正常", icon:"💩", bristolScore:4},
+    {id:10, dogId:1, time:"2026-04-09 09:00", category:"排泄", note:"正常", icon:"💩", bristolScore:4},
+    {id:11, dogId:1, time:"2026-04-08 09:00", category:"排泄", note:"正常", icon:"💩", bristolScore:3},
+    {id:12, dogId:1, time:"2026-04-07 09:00", category:"排泄", note:"正常", icon:"💩", bristolScore:4},
+    {id:13, dogId:2, time:"2026-04-13 07:30", category:"飲食", note:"早餐：60g 小型犬乾糧", icon:"🍖"},
+    {id:14, dogId:2, time:"2026-04-13 08:00", category:"排泄", note:"正常排便", icon:"💩", bristolScore:3},
+    {id:15, dogId:2, time:"2026-04-13 10:00", category:"用藥", note:"每日心絲蟲預防藥", icon:"💊"},
+  ],
+  selectedCategory: "飲食",
+  nextId: 100,
+};
+
+let bristolChartInstance = null;
+let vomitChartInstance = null;
+
+// ==================== HELPERS ====================
+function activeDog() { return state.dogs.find(d => d.id === state.activeDogId); }
+function dogRecords() {
+  return state.records
+    .filter(r => r.dogId === state.activeDogId)
+    .sort((a,b) => b.time.localeCompare(a.time));
+}
+function todayRecords() {
+  const today = "2026-04-13";
+  return dogRecords().filter(r => r.time.startsWith(today));
+}
+
+// ==================== RENDER FUNCTIONS ====================
+
+function renderDogTabs() {
+  const el = document.getElementById('dogTabs');
+  el.innerHTML = state.dogs.map(d =>
+    `<button class="dog-tab ${d.id===state.activeDogId?'active':''}" onclick="switchDog(${d.id})">${d.avatar} ${d.name}</button>`
+  ).join('');
+}
+
+function renderProfile() {
+  const d = activeDog();
+  document.getElementById('profileCard').innerHTML = `
+    <div class="profile-avatar">${d.avatar}</div>
+    <div>
+      <div class="profile-name">${d.name}</div>
+      <div class="profile-info">${d.breed} · ${d.age} 歲 · ${d.weight} kg</div>
+    </div>`;
+}
+
+function renderCalendar() {
+  const el = document.getElementById('calendar');
+  const heads = ["日","一","二","三","四","五","六"];
+  const startDay = 3; // April 2026 starts Wednesday
+  const totalDays = 30;
+  const today = 13;
+  const deworm = 15;
+
+  let html = heads.map(h => `<div class="cal-head">${h}</div>`).join('');
+  for (let i = 0; i < startDay; i++) html += '<div class="cal-day"></div>';
+  for (let d = 1; d <= totalDays; d++) {
+    let cls = 'cal-day';
+    if (d === today) cls += ' today';
+    else if (d === deworm) cls += ' deworm';
+    html += `<div class="${cls}">${d}${d===deworm?'<span class="cal-day deworm-label">🐛</span>':''}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderTasks() {
+  const tasks = [
+    {text:"吃驅蟲藥 (15號)", done:false},
+    {text:"早餐 — 已完成", done:true},
+    {text:"戶外散步 30 分鐘", done:true},
+    {text:"記錄排泄狀況", done:true},
+  ];
+  document.getElementById('taskBox').innerHTML = `
+    <div class="task-box-title">📋 今日任務</div>
+    ${tasks.map(t => `<div class="task-item"><input type="checkbox" ${t.done?'checked':''} onclick="this.checked=${t.done}"><span class="${t.done?'task-done':''}">${t.text}</span></div>`).join('')}`;
+}
+
+function renderDeworm() {
+  const daysLeft = 15 - 13;
+  document.getElementById('dewormBanner').innerHTML = `
+    <div class="deworm-banner ${daysLeft<=2?'deworm-urgent':'deworm-info'}">
+      <span style="font-size:18px">${daysLeft<=2?'🐛':'✅'}</span>
+      <div><strong>每月驅蟲提醒 (15號)</strong><small>還有 ${daysLeft} 天</small></div>
+    </div>`;
+}
+
+function renderTimeline() {
+  const recs = dogRecords().slice(0, 12);
+  const el = document.getElementById('timeline');
+  if (recs.length === 0) {
+    el.innerHTML = '<div style="text-align:center;color:var(--text3);padding:40px 0;">還沒有紀錄，點擊「新增紀錄」開始吧！</div>';
+    return;
+  }
+  el.innerHTML = recs.map(r => {
+    const isAlert = r.isAlert || r.category === '異常';
+    let bristolHtml = '';
+    if (r.bristolScore) {
+      const c = BRISTOL_COLORS[r.bristolScore];
+      bristolHtml = `<span class="bristol-tag" style="background:${c}22;color:${c}">Bristol ${r.bristolScore} — ${BRISTOL_LABELS[r.bristolScore]}</span>`;
+    }
+    return `<div class="timeline-item">
+      <div class="timeline-time">${r.time.split(' ')[1]}</div>
+      <div class="timeline-icon ${isAlert?'alert':'normal'}">${r.icon||CAT_ICONS[r.category]||'📝'}</div>
+      <div style="flex:1">
+        <div class="timeline-cat">${r.category}</div>
+        <div class="timeline-note ${isAlert?'alert-text':''}">${r.note}</div>
+        ${bristolHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCharts() {
+  // Bristol Trend
+  const bristolRecs = state.records
+    .filter(r => r.dogId === state.activeDogId && r.bristolScore)
+    .sort((a,b) => a.time.localeCompare(b.time))
+    .slice(-7);
+
+  const bristolData = bristolRecs.map(r => ({
+    date: r.time.slice(5,10).replace('-','/'),
+    score: r.bristolScore
+  }));
+
+  if (bristolChartInstance) bristolChartInstance.destroy();
+  const ctx1 = document.getElementById('bristolChart').getContext('2d');
+  bristolChartInstance = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: bristolData.map(d => d.date),
+      datasets: [{
+        label: 'Bristol 分級',
+        data: bristolData.map(d => d.score),
+        borderColor: '#c8875b',
+        backgroundColor: 'rgba(200,135,91,0.15)',
+        borderWidth: 2.5,
+        pointRadius: 5,
+        pointBackgroundColor: '#c8875b',
+        tension: 0.3,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { min: 1, max: 7, ticks: { stepSize: 1, font: { size: 10 }, color: '#b09070' },
+             grid: { color: '#f0e4d680' } },
+        x: { ticks: { font: { size: 10 }, color: '#b09070' }, grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => `Bristol ${ctx.parsed.y} — ${BRISTOL_LABELS[ctx.parsed.y]}` },
+          backgroundColor: '#5a3e1b', titleColor: '#ffd4a8', cornerRadius: 10,
+        },
+        annotation: undefined,
+      }
+    },
+    plugins: [{
+      id: 'idealZone',
+      beforeDraw(chart) {
+        const { ctx: c, chartArea: {left, right}, scales: {y} } = chart;
+        const top = y.getPixelForValue(4);
+        const bottom = y.getPixelForValue(3);
+        c.save();
+        c.fillStyle = 'rgba(76,175,80,0.08)';
+        c.fillRect(left, top, right-left, bottom-top);
+        c.strokeStyle = 'rgba(76,175,80,0.25)';
+        c.setLineDash([4,4]);
+        c.beginPath(); c.moveTo(left, top); c.lineTo(right, top); c.stroke();
+        c.beginPath(); c.moveTo(left, bottom); c.lineTo(right, bottom); c.stroke();
+        c.restore();
+      }
+    }]
+  });
+
+  // Vomit Chart
+  const vomitData = [
+    {week:"第1週", count:0}, {week:"第2週", count:1}, {week:"第3週", count:0}, {week:"第4週", count:1}
+  ];
+
+  if (vomitChartInstance) vomitChartInstance.destroy();
+  const ctx2 = document.getElementById('vomitChart').getContext('2d');
+  vomitChartInstance = new Chart(ctx2, {
+    type: 'bar',
+    data: {
+      labels: vomitData.map(d => d.week),
+      datasets: [{
+        label: '嘔吐次數',
+        data: vomitData.map(d => d.count),
+        backgroundColor: 'rgba(244,162,97,0.65)',
+        borderColor: '#f4a261',
+        borderWidth: 1.5,
+        borderRadius: 8,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 }, color: '#b09070' },
+             grid: { color: '#f0e4d680' } },
+        x: { ticks: { font: { size: 10 }, color: '#b09070' }, grid: { display: false } }
+      },
+      plugins: { legend: { display: false },
+        tooltip: { backgroundColor: '#5a3e1b', cornerRadius: 10 } }
+    }
+  });
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alertArea');
+  const dog = activeDog();
+  const hasVomit = todayRecords().some(r => r.isAlert || r.note.includes('吐'));
+  if (hasVomit) {
+    el.innerHTML = `<div class="alert-banner">
+      <div class="alert-title"><span style="font-size:20px">⚠️</span><span>嘔吐紀錄</span></div>
+      <div class="alert-body">今天${dog.name}有嘔吐紀錄。<br><strong>AI 建議：</strong>觀察精神狀況；禁食 4 小時；若連續嘔吐請立即就醫！</div>
+      <button class="alert-btn" onclick="showToast('📖 照護指南載入中...')">查看照護指南 →</button>
+    </div>`;
+  } else { el.innerHTML = ''; }
+}
+
+function renderAISummary() {
+  const dog = activeDog();
+  const recs = todayRecords();
+  const meals = recs.filter(r => r.category === '飲食').length;
+  const stools = recs.filter(r => r.category === '排泄').length;
+  const hasVomit = recs.some(r => r.isAlert);
+  const latestBristol = recs.find(r => r.bristolScore)?.bristolScore || 4;
+
+  document.getElementById('aiSummary').innerHTML =
+    `<strong>✅ 今日總結</strong><br>${dog.name}今天吃了 ${meals} 餐，排泄 ${stools} 次 (Bristol ${latestBristol})。${hasVomit ? ' 但有嘔吐紀錄，請持續觀察。' : ' 整體健康狀態佳！'}`;
+
+  const tips = [
+    "天氣變化大時，狗狗容易腸胃不適。建議少量多餐，避免突然更換飼料。",
+    "定期刷牙可以預防牙周病，建議每週至少 3 次。",
+    "散步時避免讓狗狗舔食地上的東西，以防誤食有害物質。",
+    "充足的飲水對腸胃健康很重要，可以在飼料中加入少許溫水。",
+  ];
+  document.getElementById('aiTip').innerHTML =
+    `<strong>💡 AI 養護小知識</strong><br>${tips[Math.floor(Math.random()*tips.length)]}`;
+}
+
+function renderBristolScale() {
+  const latestBristol = todayRecords().find(r => r.bristolScore)?.bristolScore || 4;
+  const el = document.getElementById('bristolScale');
+  el.innerHTML = Object.entries(BRISTOL_EMOJI).map(([score, emoji]) => {
+    const s = parseInt(score);
+    const isActive = s === latestBristol;
+    const c = BRISTOL_COLORS[s];
+    return `<div class="bristol-row ${isActive?'active':''}" style="${isActive?`background:${c}20;border-color:${c}`:''}">`
+      + `<span class="bristol-num">${s}</span><span>${emoji}</span>`
+      + `${isActive?`<span class="bristol-current" style="color:${c}">← 目前</span>`:''}</div>`;
+  }).join('');
+
+  const ideal = latestBristol >= 3 && latestBristol <= 4;
+  document.getElementById('stoolResult').innerHTML =
+    `<strong>分析結果：</strong>Type ${latestBristol} (${BRISTOL_LABELS[latestBristol]}) — ${ideal?'✅ 理想狀態':'⚠️ 需留意'}<br>`
+    + `<small>AI 建議：${ideal ? '繼續保持目前的飲食與喝水量，腸胃狀況良好！' : '建議調整飲食或增加飲水量，必要時就醫檢查。'}</small>`;
+}
+
+function renderDate() {
+  document.getElementById('todayDate').textContent = '2026 年 4 月 13 日 星期一';
+}
+
+// ==================== ACTIONS ====================
+
+function switchDog(id) {
+  state.activeDogId = id;
+  renderAll();
+}
+
+function openModal() {
+  const dog = activeDog();
+  document.getElementById('modalTitle').textContent = `📝 新增紀錄 — ${dog.name}`;
+  document.getElementById('modalOverlay').classList.add('show');
+  renderCatBtns();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+  document.getElementById('noteInput').value = '';
+}
+
+function renderCatBtns() {
+  const cats = Object.entries(CAT_ICONS);
+  document.getElementById('catBtns').innerHTML = cats.map(([cat, icon]) => {
+    const c = CAT_COLORS[cat];
+    const active = cat === state.selectedCategory;
+    return `<button class="cat-btn ${active?'active':''}" style="color:${c};${active?`border-color:${c};background:${c}18`:''}" onclick="selectCategory('${cat}')">${icon} ${cat}</button>`;
+  }).join('');
+  document.getElementById('bristolSliderBox').style.display = state.selectedCategory === '排泄' ? 'block' : 'none';
+}
+
+function selectCategory(cat) {
+  state.selectedCategory = cat;
+  renderCatBtns();
+}
+
+function updateBristolLabel() {
+  const v = document.getElementById('bristolSlider').value;
+  document.getElementById('bristolLabel').textContent = `Bristol 分級: ${v} — ${BRISTOL_LABELS[v]}`;
+}
+
+function saveRecord() {
+  const note = document.getElementById('noteInput').value.trim();
+  if (!note) { showToast('⚠️ 請輸入描述內容'); return; }
+
+  const cat = state.selectedCategory;
+  const bristolScore = cat === '排泄' ? parseInt(document.getElementById('bristolSlider').value) : undefined;
+  const now = new Date();
+  const time = `2026-04-13 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const record = {
+    id: state.nextId++,
+    dogId: state.activeDogId,
+    time,
+    category: cat,
+    note,
+    icon: CAT_ICONS[cat],
+    bristolScore,
+    isAlert: cat === '異常',
+  };
+  state.records.push(record);
+  closeModal();
+  renderAll();
+
+  // AI instant analysis
+  if (note.includes('吐') || note.includes('嘔')) {
+    showToast('⚠️ AI 偵測到嘔吐紀錄，已更新預警面板');
+  } else {
+    showToast('✅ 已成功紀錄：' + cat + ' — ' + note.slice(0,20));
+  }
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ==================== RENDER ALL ====================
+function renderAll() {
+  renderDogTabs();
+  renderProfile();
+  renderCalendar();
+  renderTasks();
+  renderDeworm();
+  renderTimeline();
+  renderCharts();
+  renderAlerts();
+  renderAISummary();
+  renderBristolScale();
+  renderDate();
+}
+
+// INIT
+renderAll();
+</script>
+</body>
+</html>
