@@ -668,8 +668,20 @@ body {
     <h3 style="margin-bottom:6px; font-size:18px; color:var(--text);">🔬 AI 便便影像辨識</h3>
     <p style="font-size:13px; color:var(--text2); margin-bottom:16px;">拍照或上傳便便照片，AI 會自動分析布里斯托分級，判斷腸胃健康。</p>
 
-    <!-- API Key -->
-    <div class="api-key-box" id="apiKeyBox">
+    <!-- Analysis Mode Toggle -->
+    <div style="display:flex; gap:6px; margin-bottom:14px;">
+      <button class="cat-btn active" id="modeLocalBtn" onclick="setAnalysisMode('local')"
+              style="flex:1; color:#2e7d32; border-color:#4caf50; background:#e8f5e920; font-size:13px;">
+        🧠 智慧分析（免設定）
+      </button>
+      <button class="cat-btn" id="modeGeminiBtn" onclick="setAnalysisMode('gemini')"
+              style="flex:1; color:#6a1b9a; font-size:13px;">
+        🤖 Gemini AI（需 API Key）
+      </button>
+    </div>
+
+    <!-- API Key (hidden by default) -->
+    <div class="api-key-box" id="apiKeyBox" style="display:none;">
       <label>🔑 Gemini API Key</label>
       <div style="display:flex; gap:6px; align-items:center;">
         <input type="password" class="api-key-input" id="geminiKey" placeholder="貼上你的 API Key..."
@@ -1118,7 +1130,20 @@ function showToast(msg) {
 
 // ==================== STOOL AI ANALYSIS ====================
 let stoolImageBase64 = null;
+let stoolImageData = null; // raw pixel data for local analysis
 let apiKeySaveTimer = null;
+let analysisMode = 'local'; // 'local' or 'gemini'
+
+function setAnalysisMode(mode) {
+  analysisMode = mode;
+  document.getElementById('apiKeyBox').style.display = mode === 'gemini' ? 'block' : 'none';
+  document.getElementById('modeLocalBtn').classList.toggle('active', mode === 'local');
+  document.getElementById('modeGeminiBtn').classList.toggle('active', mode === 'gemini');
+  document.getElementById('modeLocalBtn').style.borderColor = mode === 'local' ? '#4caf50' : '';
+  document.getElementById('modeLocalBtn').style.background = mode === 'local' ? '#e8f5e920' : '';
+  document.getElementById('modeGeminiBtn').style.borderColor = mode === 'gemini' ? '#6a1b9a' : '';
+  document.getElementById('modeGeminiBtn').style.background = mode === 'gemini' ? '#f3e5f520' : '';
+}
 
 // Load saved API key on startup
 function loadSavedApiKey() {
@@ -1181,7 +1206,7 @@ function processImageFile(file) {
   const reader = new FileReader();
   reader.onload = function(ev) {
     const dataUrl = ev.target.result;
-    stoolImageBase64 = dataUrl.split(',')[1]; // strip data:image/...;base64,
+    stoolImageBase64 = dataUrl.split(',')[1];
 
     const img = document.getElementById('previewImg');
     img.src = dataUrl;
@@ -1189,6 +1214,18 @@ function processImageFile(file) {
     document.getElementById('uploadPlaceholder').style.display = 'none';
     document.getElementById('uploadArea').classList.add('has-image');
     document.getElementById('btnAnalyze').disabled = false;
+
+    // Extract pixel data for local analysis
+    const tempImg = new Image();
+    tempImg.onload = function() {
+      const canvas = document.createElement('canvas');
+      const size = 150; // sample size
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(tempImg, 0, 0, size, size);
+      stoolImageData = ctx.getImageData(0, 0, size, size).data;
+    };
+    tempImg.src = dataUrl;
   };
   reader.readAsDataURL(file);
 }
@@ -1224,14 +1261,162 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function analyzeStool() {
-  const apiKey = document.getElementById('geminiKey').value.trim();
-  if (!apiKey) { showToast('⚠️ 請先輸入 Gemini API Key'); return; }
   if (!stoolImageBase64) { showToast('⚠️ 請先上傳照片'); return; }
+
+  if (analysisMode === 'local') {
+    analyzeStoolLocal();
+  } else {
+    analyzeStoolGemini();
+  }
+}
+
+// ===== LOCAL SMART ANALYSIS (no API needed) =====
+function analyzeStoolLocal() {
+  const btn = document.getElementById('btnAnalyze');
+  const textEl = document.getElementById('analyzeText');
+  btn.disabled = true;
+  textEl.innerHTML = '<span class="spinner"></span> 智慧分析中...';
+
+  // Simulate brief processing time for UX
+  setTimeout(() => {
+    try {
+      if (!stoolImageData) throw new Error('影像資料未就緒，請重新上傳');
+
+      const pixels = stoolImageData;
+      const total = pixels.length / 4;
+      let rSum=0, gSum=0, bSum=0;
+      let darkPixels=0, lightPixels=0, brownPixels=0, yellowPixels=0, redPixels=0, greenPixels=0;
+      let edgeVariance = 0;
+      let brightnessValues = [];
+
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i], g = pixels[i+1], b = pixels[i+2];
+        rSum += r; gSum += g; bSum += b;
+        const brightness = (r + g + b) / 3;
+        brightnessValues.push(brightness);
+
+        if (brightness < 60) darkPixels++;
+        if (brightness > 200) lightPixels++;
+
+        // Brown detection (r > g > b, warm tones)
+        if (r > 80 && r > b && g > b && r < 200 && Math.abs(r - g) < 80) brownPixels++;
+        // Yellow detection
+        if (r > 150 && g > 120 && b < 100) yellowPixels++;
+        // Red detection
+        if (r > 150 && g < 100 && b < 100) redPixels++;
+        // Green detection
+        if (g > r && g > b && g > 100) greenPixels++;
+      }
+
+      const avgR = rSum/total, avgG = gSum/total, avgB = bSum/total;
+      const avgBrightness = brightnessValues.reduce((a,b)=>a+b,0) / total;
+
+      // Calculate texture variance (indicates consistency)
+      let varianceSum = 0;
+      for (let i = 0; i < brightnessValues.length; i++) {
+        varianceSum += Math.pow(brightnessValues[i] - avgBrightness, 2);
+      }
+      const variance = varianceSum / total;
+      const uniformity = Math.max(0, 100 - Math.sqrt(variance));
+
+      const brownRatio = brownPixels / total;
+      const darkRatio = darkPixels / total;
+      const lightRatio = lightPixels / total;
+      const yellowRatio = yellowPixels / total;
+      const redRatio = redPixels / total;
+      const greenRatio = greenPixels / total;
+
+      // ===== Bristol Score Estimation =====
+      let score = 4; // default ideal
+      let confidence = 'medium';
+
+      if (darkRatio > 0.5 && uniformity > 60) {
+        score = 2; // dark and uniform = hard sausage
+        if (variance > 1500) score = 1; // very lumpy = separate hard lumps
+      } else if (darkRatio > 0.3 && brownRatio > 0.3 && uniformity > 50) {
+        score = 3; // dark brown, some texture = sausage with cracks
+      } else if (brownRatio > 0.3 && uniformity > 40 && uniformity < 75) {
+        score = 4; // good brown, moderate texture = ideal
+        confidence = 'high';
+      } else if (brownRatio > 0.2 && uniformity < 40) {
+        score = 5; // brown but uneven = soft blobs
+      } else if (lightRatio > 0.3 || yellowRatio > 0.2) {
+        score = 6; // light/yellow, mushy
+        if (lightRatio > 0.5) score = 7; // very light/liquid = watery
+      } else if (uniformity < 25) {
+        score = 6; // very uneven = mushy
+      }
+
+      // ===== Color Assessment =====
+      let colorDesc = '深棕色（正常）';
+      let colorAlert = false;
+      if (redRatio > 0.15) { colorDesc = '偏紅色（可能帶血，建議注意）'; colorAlert = true; }
+      else if (yellowRatio > 0.25) { colorDesc = '偏黃色（可能消化不完全）'; }
+      else if (greenRatio > 0.2) { colorDesc = '偏綠色（可能吃了草或膽汁問題）'; }
+      else if (darkRatio > 0.6) { colorDesc = '深黑色（注意是否有上消化道出血）'; colorAlert = true; }
+      else if (avgBrightness > 160) { colorDesc = '偏淺色（可能與飲食或肝臟相關）'; }
+      else if (brownRatio > 0.4) { colorDesc = '健康棕色'; }
+
+      // ===== Build Result =====
+      const ideal = score >= 3 && score <= 4;
+      const urgency = colorAlert ? 'high' : (score <= 2 || score >= 6) ? 'medium' : 'low';
+
+      const consistencyMap = {
+        1: '分離硬塊，像堅果', 2: '香腸形但凹凸不平', 3: '香腸形帶裂紋',
+        4: '香腸形，光滑柔軟', 5: '邊緣清晰的軟塊', 6: '邊緣模糊的糊狀', 7: '接近液態'
+      };
+      const hydrationMap = {
+        1: '嚴重缺水，建議大量補充水分', 2: '略為缺水，建議增加飲水',
+        3: '水分稍不足', 4: '水分充足，狀態理想',
+        5: '水分稍多', 6: '水分過多，可能腸胃不適', 7: '水分過多，建議就醫'
+      };
+      const adviceMap = {
+        1: '便便太硬，建議增加飲水量及膳食纖維（如南瓜泥），適當運動促進腸胃蠕動。',
+        2: '偏硬，可在飼料中加些溫水或濕糧，增加蔬菜纖維攝取。',
+        3: '接近理想！繼續目前的飲食，可稍微增加飲水量讓便便更軟滑。',
+        4: '非常理想！請繼續保持目前的飲食和喝水量，腸胃狀況很好。',
+        5: '稍軟，注意近期飲食是否有變化。如果持續偏軟，建議減少零食和油脂。',
+        6: '偏軟接近腹瀉，建議暫時少量多餐，避免油膩食物。若持續超過一天建議就醫。',
+        7: '水狀便，可能腹瀉。建議禁食4-6小時，提供充足飲水。若超過24小時請立即就醫。'
+      };
+
+      const result = {
+        score: score,
+        status: ideal ? '理想狀態' : (urgency === 'high' ? '建議就醫' : '需留意'),
+        color: colorDesc,
+        consistency: consistencyMap[score],
+        health_assessment: ideal
+          ? `Bristol ${score} 級，便便成形良好，顏色正常，腸胃健康。`
+          : `Bristol ${score} 級，${score<4?'便便偏硬，可能缺水或纖維不足':'便便偏軟，注意腸胃狀況'}。`,
+        advice: adviceMap[score] + (colorAlert ? ' ⚠️ 顏色異常，建議帶便便樣本就醫檢查。' : ''),
+        hydration: hydrationMap[score],
+        urgency: urgency
+      };
+
+      displayStoolResult(result, '🧠 智慧分析');
+      addStoolRecord(result);
+
+    } catch(err) {
+      const box = document.getElementById('aiResultBox');
+      box.classList.add('show', 'error');
+      box.querySelector('.ai-result-header').innerHTML = `<span style="font-size:20px;">❌</span> 分析失敗`;
+      box.querySelector('.ai-result-detail').innerHTML = `<strong>錯誤：</strong>${err.message}`;
+    } finally {
+      btn.disabled = false;
+      textEl.innerHTML = '🧠 開始智慧分析';
+    }
+  }, 1200);
+}
+
+// ===== GEMINI AI ANALYSIS =====
+async function analyzeStoolGemini() {
+  const apiKey = document.getElementById('geminiKey').value.trim();
+  if (!apiKey) { showToast('⚠️ 請先輸入 Gemini API Key，或切換到「智慧分析」模式'); return; }
 
   const btn = document.getElementById('btnAnalyze');
   const textEl = document.getElementById('analyzeText');
   btn.disabled = true;
-  textEl.innerHTML = '<span class="spinner"></span> AI 分析中...';
+  textEl.innerHTML = '<span class="spinner"></span> Gemini AI 分析中...';
 
   const prompt = `你是一個專業的獸醫助手 AI，專門分析狗狗的排泄物影像。
 
@@ -1263,8 +1448,7 @@ async function analyzeStool() {
 }`;
 
   try {
-    // Try multiple models in order (free tier friendly)
-    const models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+    const models = ['gemini-1.5-flash-8b', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
     let lastError = null;
     let text = '';
 
@@ -1272,41 +1456,31 @@ async function analyzeStool() {
       try {
         textEl.innerHTML = `<span class="spinner"></span> 嘗試 ${model}...`;
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: prompt },
-                  { inlineData: { mimeType: 'image/jpeg', data: stoolImageBase64 } }
-                ]
-              }],
+              contents: [{ parts: [
+                { text: prompt },
+                { inlineData: { mimeType: 'image/jpeg', data: stoolImageBase64 } }
+              ]}],
               generationConfig: { temperature: 0.2, maxOutputTokens: 600 }
             })
           }
         );
-
-        if (response.status === 429) {
-          // Rate limited — try next model
-          lastError = new Error(`${model} 額度已滿，嘗試下一個模型...`);
-          continue;
-        }
-
-        if (!response.ok) {
-          const err = await response.json();
+        if (response.status === 429 || !response.ok) {
+          const err = await response.json().catch(() => ({}));
           const msg = err.error?.message || '';
-          if (msg.includes('quota') || msg.includes('Quota') || msg.includes('rate')) {
+          if (msg.includes('quota') || msg.includes('Quota') || response.status === 429) {
             lastError = new Error(`${model} 額度已滿`);
             continue;
           }
           throw new Error(msg || `API 錯誤 (${response.status})`);
         }
-
         const data = await response.json();
         text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (text) break; // Success!
+        if (text) break;
       } catch (modelErr) {
         lastError = modelErr;
         if (modelErr.message.includes('額度')) continue;
@@ -1314,31 +1488,14 @@ async function analyzeStool() {
       }
     }
 
-    if (!text) throw lastError || new Error('所有模型都無法使用');
+    if (!text) throw lastError || new Error('所有模型都無法使用，建議切換到「智慧分析」模式');
 
-    // Parse JSON from response (handle markdown code blocks)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('AI 回覆格式異常');
 
     const result = JSON.parse(jsonMatch[0]);
-    displayStoolResult(result);
-
-    // Also add to records
-    const dog = activeDog();
-    const now = new Date();
-    const time = `2026-04-13 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-    state.records.push({
-      id: state.nextId++,
-      dogId: state.activeDogId,
-      time,
-      category: '排泄',
-      note: `AI影像分析：Bristol ${result.score} (${result.status}) — ${result.health_assessment}`,
-      icon: '🔬',
-      bristolScore: result.score,
-      isAlert: result.urgency === 'high',
-    });
-    renderAll();
-    showToast('✅ AI 分析完成，已記錄到日誌！');
+    displayStoolResult(result, '🤖 Gemini AI');
+    addStoolRecord(result);
 
   } catch (err) {
     const box = document.getElementById('aiResultBox');
@@ -1346,23 +1503,34 @@ async function analyzeStool() {
     box.querySelector('.ai-result-header').innerHTML = `<span style="font-size:20px;">❌</span> 分析失敗`;
     const isQuota = err.message.includes('額度') || err.message.includes('quota') || err.message.includes('Quota');
     box.querySelector('.ai-result-detail').innerHTML =
-      `<strong>錯誤訊息：</strong>${err.message}<br><br>`
+      `<strong>錯誤：</strong>${err.message}<br><br>`
       + (isQuota
-        ? `<strong>💡 解決方法：</strong><br>`
-          + `• 免費額度用完了，<strong>等 1 分鐘後再試一次</strong><br>`
-          + `• 或到 <a href="https://aistudio.google.com/apikey" target="_blank">Google AI Studio</a> 建立新的 API Key<br>`
-          + `• Gemini 免費版每分鐘限 15 次請求，稍等即可恢復`
-        : `<strong>常見原因：</strong><br>`
-          + `• API Key 無效或過期 → <a href="https://aistudio.google.com/apikey" target="_blank">重新申請</a><br>`
-          + `• 照片不清楚 → 請重新拍攝近照<br>`
-          + `• 網路連線問題 → 請檢查網路`);
+        ? `<strong>💡 建議：</strong>切換到上方的「🧠 智慧分析」模式，不需要 API Key 也能分析！`
+        : `<strong>💡 建議：</strong>如果 API Key 持續有問題，可以切換到「🧠 智慧分析」模式。`);
   } finally {
     btn.disabled = false;
     textEl.innerHTML = '🤖 開始 AI 分析';
   }
 }
 
-function displayStoolResult(result) {
+function addStoolRecord(result) {
+  const now = new Date();
+  const time = `2026-04-13 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  state.records.push({
+    id: state.nextId++,
+    dogId: state.activeDogId,
+    time,
+    category: '排泄',
+    note: `AI影像分析：Bristol ${result.score} (${result.status}) — ${result.health_assessment}`,
+    icon: '🔬',
+    bristolScore: result.score,
+    isAlert: result.urgency === 'high',
+  });
+  renderAll();
+  showToast('✅ 分析完成，已記錄到日誌！');
+}
+
+function displayStoolResult(result, modeLabel) {
   const box = document.getElementById('aiResultBox');
   box.classList.remove('error');
   box.classList.add('show');
@@ -1376,7 +1544,7 @@ function displayStoolResult(result) {
     `<span class="ai-result-score" style="background:${color};">${score}</span>`
     + `<div>`
     + `<div style="font-size:17px;">Bristol Type ${score} — ${BRISTOL_LABELS[score]}</div>`
-    + `<div style="font-size:13px; font-weight:400; color:var(--text2);">${result.status} ${urgencyMap[result.urgency]||''}</div>`
+    + `<div style="font-size:13px; font-weight:400; color:var(--text2);">${result.status} ${urgencyMap[result.urgency]||''} <span style="font-size:11px; opacity:0.7;">| ${modeLabel||'AI'}</span></div>`
     + `</div>`;
 
   box.querySelector('.ai-result-detail').innerHTML =
